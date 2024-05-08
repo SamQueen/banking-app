@@ -18,7 +18,7 @@ const CustomInput = ({ control, name, label, placeholder} : CustomInput) => {
   return (
         <FormField
             control={control}
-            name={name}
+            name={name || ''}
             render={({ field }) => (
                 <div className='form-item'>
                     <FormLabel className='form-label'>

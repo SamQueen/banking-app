@@ -22,9 +22,10 @@ import CustomInput from './CustomInput'
 import { authFormSchema } from '@/lib/utils'
 import { Loader2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { getLoggedInUser, signIn, signUp } from '@/lib/actions/user.actions'
 
 const AuthForm = ({ type }: { type: string }) => {
-    const router = useRouter;
+    const router = useRouter();
     const [user, setUser] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
 
@@ -40,25 +41,22 @@ const AuthForm = ({ type }: { type: string }) => {
      
     const onSubmit = async (data: z.infer<typeof formSchema>) => {
         setIsLoading(true);
-        
+
         try {
             // Sign up with appwrite and create a plaid link tokey
 
             if (type === 'sign-up') {
-                /* const newUser = await signUp(data);
-                setUser(newUser); */
+                const newUser = await signUp(data);
+                setUser(newUser);
             }
 
             if (type === 'sign-in') {
-                /* const res = await signIn({
+                const response = await signIn({
                     email: data.email,
-                    password: data.password
+                    password: data.password,
                 });
 
-                if (res) {
-                    router.push('/')
-                } */
-
+                if(response) router.push('/');
             }
         } catch (error) {
             console.log(error);
@@ -181,6 +179,7 @@ const AuthForm = ({ type }: { type: string }) => {
                                     name="email"
                                     label="Email"
                                     placeholder='Enter your email'
+                                    key='9'
                                 />
 
                                 <CustomInput 
@@ -188,6 +187,7 @@ const AuthForm = ({ type }: { type: string }) => {
                                     name="password"
                                     label="Password"
                                     placeholder='Enter your password'
+                                    key='10'
                                 />
 
                                 <div className="flex flex-col gap-4">
@@ -218,8 +218,8 @@ const AuthForm = ({ type }: { type: string }) => {
                                 : '/sign-in'
                             }>
                                 {type === 'sing-in'
-                                ? 'Sign Up'
-                                : 'Sign In'}
+                                ? 'Sign In'
+                                : 'Sign Up'}
                             </Link>
                         </footer>
                     </>
