@@ -4,8 +4,8 @@ import { ID } from "node-appwrite";
 import { createAdminClient, createSessionClient } from "../appwrite";
 import { cookies } from "next/headers";
 import { encryptId, extractCustomerIdFromUrl, parseStringify } from "../utils";
-import { CountryCode, ProcessorApexProcessorTokenCreateRequest, ProcessorTokenCreateRequest, ProcessorTokenCreateRequestProcessorEnum, Products } from "plaid";
-import { PlaidClient } from "../plaid";
+import { CountryCode, ProcessorTokenCreateRequest, ProcessorTokenCreateRequestProcessorEnum, Products } from "plaid";
+import { plaidClient } from '@/lib/plaid';
 import { revalidatePath } from "next/cache";
 import { addFundingSource, createDwollaCustomer } from "./dwolla.actions";
 
@@ -110,6 +110,7 @@ export const logoutAccount = async () => {
 }
 
 export const createLinkToken = async (user: User) => {
+  
   try {
     const tokenParams = {
       user: {
@@ -121,9 +122,9 @@ export const createLinkToken = async (user: User) => {
       country_codes: ['US'] as CountryCode[],
     }
 
-    const res = await PlaidClient.linkTokenCreate(tokenParams);
+    const response = await plaidClient.linkTokenCreate(tokenParams);
 
-    return parseStringify({ linkToken: res.data.link_token});
+    return parseStringify({ linkToken: response.data.link_token })
   } catch (error) {
     console.log(error);
   }
@@ -161,18 +162,21 @@ export const createBankAccount = async ({
 }
 
 // if funding source exists create a bank account using the user ID, item ID, access token, funding source URL, and sharable ID
-export const exchangePublicToken = async ({ publicToken, user }: exchangePublicTokenProps) => {
+export const exchangePublicToken = async ({
+  publicToken,
+  user,
+}: exchangePublicTokenProps) => {
   try {
     // Exchange public token for access token and item ID
-    const response = await PlaidClient.itemPublicTokenExchange( {
+    const response = await plaidClient.itemPublicTokenExchange({
       public_token: publicToken,
     });
 
     const accessToken = response.data.access_token;
     const itemId = response.data.item_id;
-
-    // Get account information from Plaid using the acess token
-    const accountsResponse = await PlaidClient.accountsGet ({
+    
+    // Get account information from Plaid using the access token
+    const accountsResponse = await plaidClient.accountsGet({
       access_token: accessToken,
     });
 
@@ -182,39 +186,40 @@ export const exchangePublicToken = async ({ publicToken, user }: exchangePublicT
     const request: ProcessorTokenCreateRequest = {
       access_token: accessToken,
       account_id: accountData.account_id,
-      processor: "dowolla" as ProcessorTokenCreateRequestProcessorEnum,
-    }
+      processor: "dwolla" as ProcessorTokenCreateRequestProcessorEnum,
+    };
 
-    const processorTokenResponse = await PlaidClient.processorTokenCreate(request);
+    const processorTokenResponse = await plaidClient.processorTokenCreate(request);
     const processorToken = processorTokenResponse.data.processor_token;
 
-    // Create a funding source url for the account using the Dwoll customer ID, processor token, and bank name
-    const fundingSourceUrl = await addFundingSource({
+     // Create a funding source URL for the account using the Dwolla customer ID, processor token, and bank name
+     const fundingSourceUrl = await addFundingSource({
       dwollaCustomerId: user.dwollaCustomerId,
       processorToken,
       bankName: accountData.name,
     });
-
+    
+    // If the funding source URL is not created, throw an error
     if (!fundingSourceUrl) throw Error;
 
-    // if funding source exists create a bank account using the user ID, item ID, access token, funding source URL, and sharable ID
+    // Create a bank account using the user ID, item ID, account ID, access token, funding source URL, and shareableId ID
     await createBankAccount({
       userId: user.$id,
       bankId: itemId,
       accountId: accountData.account_id,
       accessToken,
       fundingSourceUrl,
-      sharableId: encryptId(accountData.account_id)
+      shareableId: encryptId(accountData.account_id),
     });
 
-    // revalidate path to reflect changes
+    // Revalidate the path to reflect the changes
     revalidatePath("/");
 
+    // Return a success message
     return parseStringify({
       publicTokenExchange: "complete",
     });
-
   } catch (error) {
-    console.log(error);
+    console.error("An error occurred while creating exchanging token:", error);
   }
 }
